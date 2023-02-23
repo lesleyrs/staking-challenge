@@ -23,13 +23,13 @@ impl App for Game {
     fn init(pico8: &mut runty8::Pico8) -> Self {
         pico8.set_title("Staking Challenge".to_owned());
         Self {
-            total: 0,
-            points: 1000000000,
+            total: 1,
+            points: 0,
             stake: 0,
             frames: 0,
             delay: 4,
-            digit: 10,
-            pos: 112,
+            digit: 1,
+            pos: Game::FIRST_DIGIT,
             value: 1,
             hiscore: 0,
             stacks: 0,
@@ -59,20 +59,22 @@ impl App for Game {
             8 => self.value = 100,
             9 => self.value = 10,
             10 => self.value = 1,
-            _ => self.value = 1,
+            _ => unreachable!(),
         }
         if self.frames > self.delay {
             match self.digit {
                 1 => {
                     if pico8.btn(Button::Left) {
                         self.digit = 10;
-                        self.pos = 112;
+                        self.pos = Game::LAST_DIGIT;
+                        self.frames = 0;
                     }
                 }
                 _ => {
                     if pico8.btn(Button::Left) {
                         self.digit -= 1;
                         self.pos -= 4;
+                        self.frames = 0;
                     }
                 }
             }
@@ -80,13 +82,15 @@ impl App for Game {
                 10 => {
                     if pico8.btn(Button::Right) {
                         self.digit = 1;
-                        self.pos = 76;
+                        self.pos = Game::FIRST_DIGIT;
+                        self.frames = 0;
                     }
                 }
                 _ => {
                     if pico8.btn(Button::Right) {
                         self.digit += 1;
                         self.pos += 4;
+                        self.frames = 0;
                     }
                 }
             }
@@ -98,6 +102,7 @@ impl App for Game {
                 } else if self.points > self.stake + self.value {
                     self.stake = add
                 }
+                self.frames = 0;
             }
             if pico8.btn(Button::Down) {
                 // needed to avoid negative numbers while using i32
@@ -107,6 +112,7 @@ impl App for Game {
                 } else if self.stake < self.value {
                     self.stake = 0
                 }
+                self.frames = 0;
             }
             if pico8.btn(Button::Cross)
                 && self.stake != 0
@@ -132,24 +138,24 @@ impl App for Game {
                 self.last_stake = self.stake;
                 self.stake = 0;
                 self.stake_num += 1;
-                // add seperate hiscore for each difficulty
-                if self.total > self.stacks {
-                    self.stacks = self.total;
-                    self.hiscore = self.points
-                } else if self.total == self.stacks && self.points > self.hiscore {
-                    self.hiscore = self.points
-                }
-                // add game over and menu screen
-                if self.points == 0 {
-                    if self.total > 0 {
-                        self.total -= 1;
-                        self.points = i32::MAX;
-                    } else {
-                        self.game_over = true
-                    }
-                }
+                self.frames = 0;
             }
-            self.frames = 0;
+        }
+        // add game over and menu screen
+        if self.points == 0 {
+            if self.total > 0 {
+                self.total -= 1;
+                self.points = i32::MAX;
+            } else {
+                self.game_over = true
+            }
+        }
+        // add seperate hiscore for each difficulty
+        if self.total > self.stacks {
+            self.stacks = self.total;
+            self.hiscore = self.points
+        } else if self.total == self.stacks && self.points > self.hiscore {
+            self.hiscore = self.points
         }
     }
 
@@ -169,17 +175,17 @@ impl App for Game {
                 0 => pico8.print(
                     &format!("{}{}", "LOSE -", self.last_stake),
                     63 - 12 - self.last_stake.to_string().len() as i32,
-                    50 + self.anim_time,
+                    63 - 10 + self.anim_time,
                     8,
                 ),
                 1 => pico8.print(
                     &format!("{}{}", "WIN +", self.last_stake),
                     63 - 10 - self.last_stake.to_string().len() as i32,
-                    50 + self.anim_time,
+                    63 - 10 + self.anim_time,
                     11,
                 ),
-                // add text vfx
-                _ => pico8.print("INCREASE STAKE AND PRESS X", 63 - 52, 63 - 8, 15),
+                // add text blink vfx
+                _ => pico8.print("INCREASE STAKE AND PRESS X", 63 - 52, 63 - 10 + 15, 9),
             };
         }
         if self.anim_time == 30 {
@@ -187,20 +193,32 @@ impl App for Game {
             self.anim_num = self.stake_num;
         }
 
-        pico8.print("STAKING CHALLENGE", 63 - 36, 4, 15);
+        // 63 - (text length * 2) to center text
+        pico8.print("STAKING CHALLENGE", 63 - 34, 4, 15);
         pico8.print("SEE HOW HIGH YOU CAN GO!", 63 - 48, 14, 9);
-        pico8.rect(74, 28, 116, 46, 5);
-        pico8.print(&format!("{:0>10}", self.stake), 76, 30, 7);
-        pico8.print(&format!("{:>2}{}", self.digit, text), 76, 40, 9);
-        pico8.print(&format!("{}{}", "COUNTER:", self.stake_num), 4, 44, 7);
-        pico8.line(self.pos, 36, self.pos + 2, 36, 8);
+        pico8.print(
+            &format!("{}{}", "TOTAL TURNS:", self.stake_num),
+            63 - (24 + self.stake_num.to_string().len() * 2) as i32,
+            24,
+            7,
+        );
+        pico8.rectfill(7, 33, 75, 49, 5);
+        pico8.print(&format!("{}{}", "POINTS:", self.points), 8, 34, 7);
+        pico8.print(&format!("{}{}", "STACKS:", self.total), 8, 44, 7);
+        pico8.rectfill(Game::FIRST_DIGIT - 1, 33, 118, 49, 5);
+        pico8.print(&format!("{:0>10}", self.stake), Game::FIRST_DIGIT, 34, 7);
+        pico8.print(
+            &format!("{:>2}{}", self.digit, text),
+            Game::FIRST_DIGIT,
+            44,
+            9,
+        );
+        pico8.line(self.pos, 40, self.pos + 2, 40, 9);
 
         // match game difficulty and rename these
-        pico8.print(&format!("{}{:0>10}", "POINTS:", self.points), 4, 24, 7);
-        pico8.print(&format!("{}{}", "STACKS:", self.total), 4, 34, 7);
-        pico8.print(&format!("{:0>10}{}", self.hiscore, " POINTS + "), 4, 122, 7);
-        pico8.print(&format!("{:0>3}{}", self.stacks, " STACKS"), 85, 122, 7);
-        pico8.print("PERSONAL BEST", 63 - 26, 112, 9);
+        pico8.print("PERSONAL BEST", 63 - 26, 108, 9);
+        pico8.print(&format!("{:0>10}{}", self.hiscore, " POINTS + "), 4, 118, 7);
+        pico8.print(&format!("{:0>3}{}", self.stacks, " STACKS"), 85, 118, 7);
         // if self.game_over {
         //     pico8.cls(15);
         //     // add text vfx
@@ -210,8 +228,8 @@ impl App for Game {
 }
 
 impl Game {
-    // const WIDTH: i32 = 127;
-    // const HEIGHT: i32 = 127;
+    const FIRST_DIGIT: i32 = 79;
+    const LAST_DIGIT: i32 = 115;
 }
 
 fn main() {
