@@ -21,7 +21,7 @@ struct Game {
 
 impl App for Game {
     fn init(pico8: &mut runty8::Pico8) -> Self {
-        pico8.set_title("Staking Challenge".to_owned());
+        pico8.set_title(Game::TITLE.to_owned());
         Self {
             total: 1,
             points: 0,
@@ -194,7 +194,12 @@ impl App for Game {
         }
 
         // 63 - (text length * 2) to center text
-        pico8.print("STAKING CHALLENGE", 63 - 34, 4, 15);
+        pico8.print(
+            &Game::TITLE.to_uppercase(),
+            63 - (Game::TITLE.len() * 2) as i32,
+            4,
+            15,
+        );
         pico8.print("SEE HOW HIGH YOU CAN GO!", 63 - 48, 14, 9);
         pico8.print(
             &format!("{}{}", "TOTAL TURNS:", self.stake_num),
@@ -228,6 +233,7 @@ impl App for Game {
 }
 
 impl Game {
+    const TITLE: &str = "Staking Challenge";
     const FIRST_DIGIT: i32 = 79;
     const LAST_DIGIT: i32 = 115;
 }
