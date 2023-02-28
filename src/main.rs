@@ -1,7 +1,7 @@
 use runty8::{rnd, App, Button};
 
 struct Game {
-    total: u8,
+    stacks: u8,
     points: i32,
     stake: i32,
     frames: i32,
@@ -9,8 +9,8 @@ struct Game {
     digit: u8,
     pos: i32,
     value: i32,
-    hiscore: i32,
-    stacks: u8,
+    max_points: i32,
+    max_stacks: u8,
     rng: u8,
     game_over: bool,
     anim_time: i32,
@@ -30,7 +30,7 @@ impl App for Game {
     fn init(pico8: &mut runty8::Pico8) -> Self {
         pico8.set_title(Game::TITLE.to_owned());
         Self {
-            total: 0,
+            stacks: 0,
             points: 0,
             stake: 0,
             frames: 0,
@@ -38,8 +38,8 @@ impl App for Game {
             digit: 1,
             pos: Game::FIRST_DIGIT,
             value: 0,
-            hiscore: 0,
-            stacks: 0,
+            max_points: 0,
+            max_stacks: 0,
             rng: 2,
             game_over: true,
             last_stake: 0,
@@ -59,7 +59,7 @@ impl App for Game {
     fn update(&mut self, pico8: &mut runty8::Pico8) {
         self.frames += 1;
         // add menu with difficulty setting + game over + rectfill
-        // vfx for adding to total+points "stack" + pset fireworks?
+        // vfx for adding to stacks+points "stack" + pset fireworks?
 
         // how to calc this instead?
         match self.digit {
@@ -140,7 +140,7 @@ impl App for Game {
                 if self.rng == 1 {
                     let (mut a, b) = self.points.overflowing_add(self.stake);
                     if b {
-                        self.total += 1;
+                        self.stacks += 1;
                         a -= i32::MIN;
                         // +1 is needed because overflowing takes 1 to reach 0
                         a += 1;
@@ -150,7 +150,7 @@ impl App for Game {
                 if self.rng == 0 {
                     self.points -= self.stake;
                 }
-                if self.points == 0 && self.total == 0 && self.invested == 0 {
+                if self.points == 0 && self.stacks == 0 && self.invested == 0 {
                     self.lose_msg = true;
                 }
                 self.last_stake = self.stake;
@@ -166,7 +166,7 @@ impl App for Game {
         {
             match self.invested {
                 0 => {
-                    if self.stake < self.points || self.total > 0 {
+                    if self.stake < self.points || self.stacks > 0 {
                         // add if statement or some shit to fix it
                         let stake = self.stake;
                         self.invested += stake;
@@ -177,7 +177,7 @@ impl App for Game {
                 _ => {
                     let (mut a, b) = self.points.overflowing_add(self.invested);
                     if b {
-                        self.total += 1;
+                        self.stacks += 1;
                         a -= i32::MIN;
                         // +1 is needed because overflowing takes 1 to reach 0
                         a += 1;
@@ -220,6 +220,7 @@ impl App for Game {
             && self.anim_num == self.stake_num
         {
             self.game_over = false;
+            self.stacks = 0;
             self.digit = 1;
             self.pos = Game::FIRST_DIGIT;
             self.invested = 0;
@@ -227,24 +228,14 @@ impl App for Game {
             self.stake_num = 0;
             self.anim_num = 0;
             self.lose_msg = false;
+            self.points = 25;
 
+            // add challenges based on difficulty
             match self.arrow_pos {
-                Game::SELECT_FIRST => {
-                    self.total = 0;
-                    self.points = 25;
-                }
-                75 => {
-                    self.total = 0;
-                    self.points = 25;
-                }
-                85 => {
-                    self.total = 0;
-                    self.points = 25;
-                }
-                Game::SELECT_LAST => {
-                    self.total = 0;
-                    self.points = 25;
-                }
+                Game::SELECT_FIRST => {}
+                75 => {}
+                85 => {}
+                Game::SELECT_LAST => {}
                 _ => unreachable!(),
             }
         }
@@ -253,8 +244,8 @@ impl App for Game {
         }
         // add game over and menu screen
         if self.points == 0 {
-            if self.total > 0 {
-                self.total -= 1;
+            if self.stacks > 0 {
+                self.stacks -= 1;
                 self.points = i32::MAX;
             } else if self.invested > 0 {
                 self.points = self.invested;
@@ -264,11 +255,11 @@ impl App for Game {
             }
         }
         // add seperate hiscore for each difficulty
-        if self.total > self.stacks {
-            self.stacks = self.total;
-            self.hiscore = self.points
-        } else if self.total == self.stacks && self.points > self.hiscore {
-            self.hiscore = self.points
+        if self.stacks > self.max_stacks {
+            self.max_stacks = self.stacks;
+            self.max_points = self.points
+        } else if self.stacks == self.max_stacks && self.points > self.max_points {
+            self.max_points = self.points
         }
     }
 
@@ -283,7 +274,7 @@ impl App for Game {
         if pico8.btnp(Button::Cross)
             && self.investing
             && self.invested == 0
-            && self.total == 0
+            && self.stacks == 0
             && self.stake == self.points
             && !self.show_msg
         {
@@ -351,7 +342,7 @@ impl App for Game {
             }
         }
         pico8.print(&format!("{}{}", "POINTS:", self.points), 8, 24, 7);
-        pico8.print(&format!("{}{}", "STACKS:", self.total), 8, 34, 7);
+        pico8.print(&format!("{}{}", "STACKS:", self.stacks), 8, 34, 7);
         pico8.rectfill(Game::FIRST_DIGIT - 1, 23, 118, 39, 5);
         pico8.print(&format!("{:0>10}", self.stake), Game::FIRST_DIGIT, 24, 7);
         pico8.print(
@@ -365,8 +356,13 @@ impl App for Game {
         pico8.print(&format!("{}{}", "INCOME:", self.income), 8, 53, 7);
         // match game difficulty and rename these (not much point if no saves though)
         pico8.print("PERSONAL BEST", 63 - 26, 108, 9);
-        pico8.print(&format!("{:0>10}{}", self.hiscore, " POINTS + "), 4, 118, 7);
-        pico8.print(&format!("{:0>3}{}", self.stacks, " STACKS"), 85, 118, 7);
+        pico8.print(
+            &format!("{:0>10}{}", self.max_points, " POINTS + "),
+            4,
+            118,
+            7,
+        );
+        pico8.print(&format!("{:0>3}{}", self.max_stacks, " STACKS"), 85, 118, 7);
         if self.game_over && self.anim_num == self.stake_num {
             pico8.rectfill(20, 61, 107, 104, 5);
             pico8.print("EASY", 63 - 8, 65, 7);
