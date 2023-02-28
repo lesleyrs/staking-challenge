@@ -25,6 +25,9 @@ struct Game {
     arrow_pos: i32,
     lose_msg: bool,
     start_timer: u8,
+    chall_points: i32,
+    chall_turns: i32,
+    limitless: bool,
 }
 
 impl App for Game {
@@ -55,6 +58,9 @@ impl App for Game {
             arrow_pos: 65,
             lose_msg: false,
             start_timer: 0,
+            chall_points: 0,
+            chall_turns: 0,
+            limitless: false,
         }
     }
 
@@ -229,15 +235,23 @@ impl App for Game {
             self.stake_num = 0;
             self.anim_num = 0;
             self.lose_msg = false;
-            self.points = 25;
             self.start_timer = 0;
 
             // add challenges based on difficulty
             match self.arrow_pos {
-                Game::SELECT_FIRST => {}
-                75 => {}
-                85 => {}
-                Game::SELECT_LAST => {}
+                Game::SELECT_FIRST => {
+                    self.points = 1000000000;
+                }
+                75 => {
+                    self.points = 1000000;
+                }
+                85 => {
+                    self.points = 1000;
+                }
+                Game::SELECT_LAST => {
+                    self.limitless = true;
+                    self.points = 25;
+                }
                 _ => unreachable!(),
             }
         }
@@ -252,14 +266,17 @@ impl App for Game {
                 self.points = self.invested;
                 self.invested = 0;
             } else {
+                self.limitless = false;
                 self.game_over = true;
             }
         }
-        if self.stacks > self.max_stacks {
-            self.max_stacks = self.stacks;
-            self.max_points = self.points
-        } else if self.stacks == self.max_stacks && self.points > self.max_points {
-            self.max_points = self.points
+        if self.limitless {
+            if self.stacks > self.max_stacks {
+                self.max_stacks = self.stacks;
+                self.max_points = self.points
+            } else if self.stacks == self.max_stacks && self.points > self.max_points {
+                self.max_points = self.points
+            }
         }
     }
 
@@ -354,7 +371,7 @@ impl App for Game {
         pico8.print(&format!("{}{}", "INVEST:", self.invested), 8, 43, 7);
         pico8.print(&format!("{}{}", "INCOME:", self.income), 8, 53, 7);
 
-        pico8.print("PERSONAL BEST", 63 - 26, 108, 9);
+        pico8.print("LIMITLESS PERSONAL BEST", 63 - 46, 108, 9);
         pico8.print(
             &format!("{:0>10}{}", self.max_points, " POINTS + "),
             4,
