@@ -24,6 +24,7 @@ struct Game {
     show_msg: bool,
     arrow_pos: i32,
     lose_msg: bool,
+    start_timer: u8,
 }
 
 impl App for Game {
@@ -40,7 +41,7 @@ impl App for Game {
             value: 0,
             max_points: 0,
             max_stacks: 0,
-            rng: 2,
+            rng: 2, // useful for showing a message without titlescreen for matching _
             game_over: true,
             last_stake: 0,
             anim_time: 0,
@@ -53,14 +54,12 @@ impl App for Game {
             show_msg: false,
             arrow_pos: 65,
             lose_msg: false,
+            start_timer: 0,
         }
     }
 
     fn update(&mut self, pico8: &mut runty8::Pico8) {
         self.frames += 1;
-        // add menu with difficulty setting + game over + rectfill
-        // vfx for adding to stacks+points "stack" + pset fireworks?
-
         // how to calc this instead?
         match self.digit {
             1 => self.value = 1000000000,
@@ -129,6 +128,7 @@ impl App for Game {
                 self.frames = 0;
             }
             if !self.game_over
+                && self.start_timer == 10
                 && self.anim_num == self.stake_num
                 && !self.investing
                 && self.stake != 0
@@ -159,6 +159,7 @@ impl App for Game {
                 self.frames = 0;
             }
         }
+        // avoid staking by setting stake to 0 before setting investing to false
         if !self.game_over
             && self.anim_num == self.stake_num
             && self.investing
@@ -167,11 +168,12 @@ impl App for Game {
             match self.invested {
                 0 => {
                     if self.stake < self.points || self.stacks > 0 {
-                        // add if statement or some shit to fix it
+                        // add actual income
                         let stake = self.stake;
                         self.invested += stake;
                         self.points -= stake;
                         self.stake = 0;
+                        self.investing = false;
                     }
                 }
                 _ => {
@@ -214,11 +216,10 @@ impl App for Game {
                 }
             }
         }
-        if self.game_over
-            && pico8.btnp(Button::Cross)
-            && !pico8.btn(Button::Up)
-            && self.anim_num == self.stake_num
-        {
+        if !self.lose_msg && self.start_timer < 10 {
+            self.start_timer += 1;
+        }
+        if self.game_over && pico8.btnp(Button::Cross) && self.anim_num == self.stake_num {
             self.game_over = false;
             self.stacks = 0;
             self.digit = 1;
@@ -229,6 +230,7 @@ impl App for Game {
             self.anim_num = 0;
             self.lose_msg = false;
             self.points = 25;
+            self.start_timer = 0;
 
             // add challenges based on difficulty
             match self.arrow_pos {
@@ -242,7 +244,6 @@ impl App for Game {
         if pico8.btnp(Button::Circle) && !self.game_over {
             self.investing = !self.investing;
         }
-        // add game over and menu screen
         if self.points == 0 {
             if self.stacks > 0 {
                 self.stacks -= 1;
@@ -254,7 +255,6 @@ impl App for Game {
                 self.game_over = true;
             }
         }
-        // add seperate hiscore for each difficulty
         if self.stacks > self.max_stacks {
             self.max_stacks = self.stacks;
             self.max_points = self.points
@@ -306,8 +306,7 @@ impl App for Game {
                     63 + self.anim_time,
                     11,
                 ),
-                // add text blink vfx
-                _ => pico8.print("INCREASE STAKE AND PRESS X", 63 - 52, 63 + 15, 9),
+                _ => unreachable!(),
             };
         }
         if self.anim_time == 30 {
@@ -354,7 +353,7 @@ impl App for Game {
         pico8.line(self.pos, 30, self.pos + 2, 30, 9);
         pico8.print(&format!("{}{}", "INVEST:", self.invested), 8, 43, 7);
         pico8.print(&format!("{}{}", "INCOME:", self.income), 8, 53, 7);
-        // match game difficulty and rename these (not much point if no saves though)
+
         pico8.print("PERSONAL BEST", 63 - 26, 108, 9);
         pico8.print(
             &format!("{:0>10}{}", self.max_points, " POINTS + "),
