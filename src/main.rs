@@ -28,6 +28,7 @@ struct Game {
     chall_points: i32,
     chall_turns: i32,
     limitless: bool,
+    game_won: bool,
 }
 
 impl App for Game {
@@ -61,6 +62,7 @@ impl App for Game {
             chall_points: 0,
             chall_turns: 0,
             limitless: false,
+            game_won: false,
         }
     }
 
@@ -237,24 +239,24 @@ impl App for Game {
             self.lose_msg = false;
             self.start_timer = 0;
             self.chall_turns = 100;
+            self.game_won = false;
 
-            // add challenges based on difficulty
             match self.arrow_pos {
                 Game::SELECT_FIRST => {
-                    self.points = 250000000; // 250m
                     self.chall_points = i32::MAX;
+                    self.points = 250000000; // 250m
                 }
                 75 => {
-                    self.points = 50000000; // 50m
                     self.chall_points = 1000000000;
+                    self.points = 50000000; // 50m
                 }
                 85 => {
-                    self.points = 10000; // 10k from stronghold of security
                     self.chall_points = 10000000;
+                    self.points = 10000; // 10k from stronghold of security
                 }
                 Game::SELECT_LAST => {
-                    self.points = 25; // 25 from tutorial island
                     self.limitless = true;
+                    self.points = 25; // 25 from tutorial island
                 }
                 _ => unreachable!(),
             }
@@ -262,10 +264,15 @@ impl App for Game {
         if pico8.btnp(Button::Circle) && !self.game_over {
             self.investing = !self.investing;
         }
-        if !self.limitless && self.stake_num == self.chall_turns {
-            self.invested = 0;
-            self.stacks = 0;
-            self.points = 0;
+        if !self.limitless && !self.game_over {
+            if self.points >= self.chall_points {
+                self.game_won = true;
+            }
+            if self.stake_num == self.chall_turns || self.points >= self.chall_points {
+                self.invested = 0;
+                self.stacks = 0;
+                self.points = 0;
+            }
         }
         if self.points == 0 {
             if self.stacks > 0 {
@@ -317,7 +324,10 @@ impl App for Game {
             }
         }
         if self.lose_msg {
-            pico8.print("GAME OVER!", Game::FIRST_DIGIT, 53, 8);
+            match self.game_won {
+                false => pico8.print("GAME OVER!", Game::FIRST_DIGIT, 53, 8),
+                true => pico8.print("YOU WIN!", Game::FIRST_DIGIT, 53, 11),
+            }
         }
         if self.anim_num != self.stake_num && self.stake_num > 0 {
             self.anim_time += 1;
