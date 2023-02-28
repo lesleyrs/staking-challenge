@@ -236,27 +236,36 @@ impl App for Game {
             self.anim_num = 0;
             self.lose_msg = false;
             self.start_timer = 0;
+            self.chall_turns = 100;
 
             // add challenges based on difficulty
             match self.arrow_pos {
                 Game::SELECT_FIRST => {
-                    self.points = 1000000000;
+                    self.points = 250000000; // 250m
+                    self.chall_points = i32::MAX;
                 }
                 75 => {
-                    self.points = 1000000;
+                    self.points = 50000000; // 50m
+                    self.chall_points = 1000000000;
                 }
                 85 => {
-                    self.points = 1000;
+                    self.points = 10000; // 10k from stronghold of security
+                    self.chall_points = 10000000;
                 }
                 Game::SELECT_LAST => {
+                    self.points = 25; // 25 from tutorial island
                     self.limitless = true;
-                    self.points = 25;
                 }
                 _ => unreachable!(),
             }
         }
         if pico8.btnp(Button::Circle) && !self.game_over {
             self.investing = !self.investing;
+        }
+        if !self.limitless && self.stake_num == self.chall_turns {
+            self.invested = 0;
+            self.stacks = 0;
+            self.points = 0;
         }
         if self.points == 0 {
             if self.stacks > 0 {
@@ -266,7 +275,9 @@ impl App for Game {
                 self.points = self.invested;
                 self.invested = 0;
             } else {
-                self.limitless = false;
+                if self.limitless {
+                    self.limitless = false;
+                }
                 self.game_over = true;
             }
         }
