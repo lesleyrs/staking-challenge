@@ -17,28 +17,42 @@ struct Game {
     last_stake: i32,
     stake_num: i32,
     anim_num: i32,
+    investing: bool,
+    invested: i32,
+    income: i32,
+    msg_timer: u8,
+    show_msg: bool,
+    arrow_pos: i32,
+    lose_msg: bool,
 }
 
 impl App for Game {
     fn init(pico8: &mut runty8::Pico8) -> Self {
         pico8.set_title(Game::TITLE.to_owned());
         Self {
-            total: 1,
+            total: 0,
             points: 0,
             stake: 0,
             frames: 0,
             delay: 4,
             digit: 1,
             pos: Game::FIRST_DIGIT,
-            value: 1,
+            value: 0,
             hiscore: 0,
             stacks: 0,
             rng: 2,
-            game_over: false,
+            game_over: true,
             last_stake: 0,
             anim_time: 0,
             stake_num: 0,
             anim_num: 0,
+            investing: false,
+            invested: 0,
+            income: 0,
+            msg_timer: 0,
+            show_msg: false,
+            arrow_pos: 65,
+            lose_msg: false,
         }
     }
 
@@ -114,10 +128,11 @@ impl App for Game {
                 }
                 self.frames = 0;
             }
-            if pico8.btn(Button::Cross)
-                && self.stake != 0
-                && !self.game_over
+            if !self.game_over
                 && self.anim_num == self.stake_num
+                && !self.investing
+                && self.stake != 0
+                && pico8.btn(Button::Cross)
             {
                 // not exactly 50/50 as it rounds float up halfway
                 // flr() favors lower ints because it still generates a float
@@ -133,7 +148,10 @@ impl App for Game {
                     self.points = a;
                 }
                 if self.rng == 0 {
-                    self.points -= self.stake
+                    self.points -= self.stake;
+                }
+                if self.points == 0 && self.total == 0 && self.invested == 0 {
+                    self.lose_msg = true;
                 }
                 self.last_stake = self.stake;
                 self.stake = 0;
@@ -141,13 +159,108 @@ impl App for Game {
                 self.frames = 0;
             }
         }
+        if !self.game_over
+            && self.anim_num == self.stake_num
+            && self.investing
+            && pico8.btnp(Button::Cross)
+        {
+            match self.invested {
+                0 => {
+                    if self.stake < self.points || self.total > 0 {
+                        // add if statement or some shit to fix it
+                        let stake = self.stake;
+                        self.invested += stake;
+                        self.points -= stake;
+                        self.stake = 0;
+                    }
+                }
+                _ => {
+                    let (mut a, b) = self.points.overflowing_add(self.invested);
+                    if b {
+                        self.total += 1;
+                        a -= i32::MIN;
+                        // +1 is needed because overflowing takes 1 to reach 0
+                        a += 1;
+                    }
+                    self.points = a;
+                    self.invested = 0;
+                }
+            }
+        }
+        // input is not really disabled here for adding to stake but can't increase from 0
+        if self.game_over {
+            match self.arrow_pos {
+                Game::SELECT_FIRST => {
+                    if pico8.btnp(Button::Up) {
+                        self.arrow_pos = Game::SELECT_LAST;
+                    }
+                }
+                _ => {
+                    if pico8.btnp(Button::Up) {
+                        self.arrow_pos -= 10;
+                    }
+                }
+            }
+            match self.arrow_pos {
+                Game::SELECT_LAST => {
+                    if pico8.btnp(Button::Down) {
+                        self.arrow_pos = Game::SELECT_FIRST;
+                    }
+                }
+                _ => {
+                    if pico8.btnp(Button::Down) {
+                        self.arrow_pos += 10;
+                    }
+                }
+            }
+        }
+        if self.game_over
+            && pico8.btnp(Button::Cross)
+            && !pico8.btn(Button::Up)
+            && self.anim_num == self.stake_num
+        {
+            self.game_over = false;
+            self.digit = 1;
+            self.pos = Game::FIRST_DIGIT;
+            self.invested = 0;
+            self.income = 0;
+            self.stake_num = 0;
+            self.anim_num = 0;
+            self.lose_msg = false;
+
+            match self.arrow_pos {
+                Game::SELECT_FIRST => {
+                    self.total = 0;
+                    self.points = 25;
+                }
+                75 => {
+                    self.total = 0;
+                    self.points = 25;
+                }
+                85 => {
+                    self.total = 0;
+                    self.points = 25;
+                }
+                Game::SELECT_LAST => {
+                    self.total = 0;
+                    self.points = 25;
+                }
+                _ => unreachable!(),
+            }
+        }
+        if pico8.btnp(Button::Circle) && !self.game_over {
+            self.investing = !self.investing;
+        }
         // add game over and menu screen
         if self.points == 0 {
             if self.total > 0 {
                 self.total -= 1;
                 self.points = i32::MAX;
+            } else if self.invested > 0 {
+                self.points = self.invested;
+                self.invested = 0;
             } else {
-                self.game_over = true
+                self.game_over = true;
             }
         }
         // add seperate hiscore for each difficulty
@@ -167,25 +280,43 @@ impl App for Game {
             _ => "TH DIGIT",
         };
         pico8.cls(0);
-        if self.anim_num != self.stake_num || self.stake_num == 0 {
-            if self.stake_num > 0 {
-                self.anim_time += 1;
+        if pico8.btnp(Button::Cross)
+            && self.investing
+            && self.invested == 0
+            && self.total == 0
+            && self.stake == self.points
+            && !self.show_msg
+        {
+            self.show_msg = true;
+        }
+        if self.show_msg {
+            self.msg_timer += 1;
+            pico8.print("TOO MUCH!", Game::FIRST_DIGIT, 43, 7);
+            if self.msg_timer == 30 {
+                self.msg_timer = 0;
+                self.show_msg = false;
             }
+        }
+        if self.lose_msg {
+            pico8.print("GAME OVER!", Game::FIRST_DIGIT, 53, 8);
+        }
+        if self.anim_num != self.stake_num && self.stake_num > 0 {
+            self.anim_time += 1;
             match self.rng {
                 0 => pico8.print(
                     &format!("{}{}", "LOSE -", self.last_stake),
                     63 - 12 - self.last_stake.to_string().len() as i32,
-                    63 - 10 + self.anim_time,
+                    63 + self.anim_time,
                     8,
                 ),
                 1 => pico8.print(
                     &format!("{}{}", "WIN +", self.last_stake),
                     63 - 10 - self.last_stake.to_string().len() as i32,
-                    63 - 10 + self.anim_time,
+                    63 + self.anim_time,
                     11,
                 ),
                 // add text blink vfx
-                _ => pico8.print("INCREASE STAKE AND PRESS X", 63 - 52, 63 - 10 + 15, 9),
+                _ => pico8.print("INCREASE STAKE AND PRESS X", 63 - 52, 63 + 15, 9),
             };
         }
         if self.anim_time == 30 {
@@ -193,42 +324,65 @@ impl App for Game {
             self.anim_num = self.stake_num;
         }
 
-        // 63 - (text length * 2) to center text
+        // 63 - (text length * 2) to center text horizontically
+        // 63 - 3 to center text vertically
+
+        // set this to current challenge instead of title?
         pico8.print(
             &Game::TITLE.to_uppercase(),
             63 - (Game::TITLE.len() * 2) as i32,
             4,
             15,
         );
-        pico8.print("SEE HOW HIGH YOU CAN GO!", 63 - 48, 14, 9);
         pico8.print(
             &format!("{}{}", "TOTAL TURNS:", self.stake_num),
             63 - (24 + self.stake_num.to_string().len() * 2) as i32,
-            24,
+            14,
             7,
         );
-        pico8.rectfill(7, 33, 75, 49, 5);
-        pico8.print(&format!("{}{}", "POINTS:", self.points), 8, 34, 7);
-        pico8.print(&format!("{}{}", "STACKS:", self.total), 8, 44, 7);
-        pico8.rectfill(Game::FIRST_DIGIT - 1, 33, 118, 49, 5);
-        pico8.print(&format!("{:0>10}", self.stake), Game::FIRST_DIGIT, 34, 7);
+        match self.investing {
+            false => {
+                pico8.rectfill(7, 23, 75, 39, 1);
+                pico8.rectfill(7, 42, 75, 58, 5);
+            }
+            true => {
+                pico8.rectfill(7, 23, 75, 39, 5);
+                pico8.rectfill(7, 42, 75, 58, 1);
+            }
+        }
+        pico8.print(&format!("{}{}", "POINTS:", self.points), 8, 24, 7);
+        pico8.print(&format!("{}{}", "STACKS:", self.total), 8, 34, 7);
+        pico8.rectfill(Game::FIRST_DIGIT - 1, 23, 118, 39, 5);
+        pico8.print(&format!("{:0>10}", self.stake), Game::FIRST_DIGIT, 24, 7);
         pico8.print(
             &format!("{:>2}{}", self.digit, text),
             Game::FIRST_DIGIT,
-            44,
+            34,
             9,
         );
-        pico8.line(self.pos, 40, self.pos + 2, 40, 9);
-
-        // match game difficulty and rename these
+        pico8.line(self.pos, 30, self.pos + 2, 30, 9);
+        pico8.print(&format!("{}{}", "INVEST:", self.invested), 8, 43, 7);
+        pico8.print(&format!("{}{}", "INCOME:", self.income), 8, 53, 7);
+        // match game difficulty and rename these (not much point if no saves though)
         pico8.print("PERSONAL BEST", 63 - 26, 108, 9);
         pico8.print(&format!("{:0>10}{}", self.hiscore, " POINTS + "), 4, 118, 7);
         pico8.print(&format!("{:0>3}{}", self.stacks, " STACKS"), 85, 118, 7);
-        // if self.game_over {
-        //     pico8.cls(15);
-        //     // add text vfx
-        //     pico8.print("PRESS X TO RESTART", 63 - 36, 50, 10);
-        // }
+        if self.game_over && self.anim_num == self.stake_num {
+            pico8.rectfill(20, 61, 107, 104, 5);
+            pico8.print("EASY", 63 - 8, 65, 7);
+            pico8.print("MEDIUM", 63 - 12, 75, 7);
+            pico8.print("HARD", 63 - 8, 85, 7);
+            pico8.print("LIMITLESS", 63 - 18, 95, 7);
+            pico8.pset(38, self.arrow_pos, 9);
+            pico8.pset(38, self.arrow_pos + 1, 9);
+            pico8.pset(38, self.arrow_pos + 2, 9);
+            pico8.pset(38, self.arrow_pos + 3, 9);
+            pico8.pset(38, self.arrow_pos + 4, 9);
+            pico8.pset(39, self.arrow_pos + 1, 9);
+            pico8.pset(39, self.arrow_pos + 2, 9);
+            pico8.pset(39, self.arrow_pos + 3, 9);
+            pico8.pset(40, self.arrow_pos + 2, 9);
+        }
     }
 }
 
@@ -236,6 +390,8 @@ impl Game {
     const TITLE: &str = "Staking Challenge";
     const FIRST_DIGIT: i32 = 79;
     const LAST_DIGIT: i32 = 115;
+    const SELECT_FIRST: i32 = 65;
+    const SELECT_LAST: i32 = 95;
 }
 
 fn main() {
