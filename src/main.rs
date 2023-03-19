@@ -264,6 +264,31 @@ impl App for Game {
         if !self.end_message && self.start_timer < 10 {
             self.start_timer += 1;
         }
+        if self.game_over {
+            match self.arrow_pos {
+                Game::SELECT_FIRST => {
+                    self.difficulty = "EASY".to_string();
+                    self.chall_stacks = 3;
+                    self.chall_points = 0;
+                }
+                Game::SELECT_SECOND => {
+                    self.difficulty = "NORMAL".to_string();
+                    self.chall_stacks = 1;
+                    self.chall_points = 0;
+                }
+                Game::SELECT_THIRD => {
+                    self.difficulty = "HARD".to_string();
+                    self.chall_stacks = 0;
+                    self.chall_points = 10000000;
+                }
+                Game::SELECT_LAST => {
+                    self.difficulty = "LIMITLESS".to_string();
+                    self.chall_stacks = 0;
+                    self.chall_points = 0;
+                }
+                _ => unreachable!(),
+            }
+        }
         if self.game_over && pico8.btnp(Button::Cross) && self.anim_num == self.stake_num {
             self.game_over = false;
             self.stacks = 0;
@@ -279,27 +304,17 @@ impl App for Game {
 
             match self.arrow_pos {
                 Game::SELECT_FIRST => {
-                    self.chall_stacks = 3;
-                    self.chall_points = 0;
                     self.points = 250000000; // 250m
-                    self.difficulty = "EASY".to_string();
                 }
-                75 => {
-                    self.chall_stacks = 1;
-                    self.chall_points = 0;
+                Game::SELECT_SECOND => {
                     self.points = 50000000; // 50m
-                    self.difficulty = "NORMAL".to_string();
                 }
-                85 => {
-                    self.chall_stacks = 0;
-                    self.chall_points = 10000000;
+                Game::SELECT_THIRD => {
                     self.points = 10000; // 10k from stronghold of security
-                    self.difficulty = "HARD".to_string();
                 }
                 Game::SELECT_LAST => {
                     self.limitless = true;
                     self.points = 25; // 25 from tutorial island
-                    self.difficulty = "LIMITLESS".to_string();
                 }
                 _ => unreachable!(),
             }
@@ -407,7 +422,67 @@ impl App for Game {
             4,
             15,
         );
-        match self.game_over {
+        match self.limitless {
+            false => {
+                let remaining = self.chall_turns - self.stake_num;
+                match self.arrow_pos {
+                    Game::SELECT_LAST => {
+                        pico8.print(
+                            &format!("{}{}", "TURNS:", self.stake_num),
+                            63 - (12 + self.stake_num.to_string().len() * 2) as i32,
+                            14,
+                            7,
+                        );
+                    }
+                    _ => {
+                        pico8.print(
+                            &format!(
+                                "{}{}{}{}",
+                                "TURNS:", self.stake_num, " REMAINING:", remaining
+                            ),
+                            63 - (12
+                                + self.stake_num.to_string().len() * 2
+                                + 22
+                                + remaining.to_string().len() * 2)
+                                as i32,
+                            14,
+                            7,
+                        );
+                        pico8.print(
+                            &format!("{}{}", "CHALLENGE - ", self.difficulty),
+                            63 - 24 - (self.difficulty.len() * 2) as i32,
+                            108,
+                            9,
+                        );
+                    }
+                }
+                match self.arrow_pos {
+                    Game::SELECT_LAST => {
+                        pico8.print("LIMITLESS PERSONAL BEST", 63 - 46, 108, 9);
+                        pico8.print(
+                            &format!("{:0>10}{}", self.max_points, " POINTS + "),
+                            4,
+                            118,
+                            7,
+                        );
+                        pico8.print(&format!("{:0>3}{}", self.max_stacks, " STACKS"), 85, 118, 7);
+                    }
+                    _ => {
+                        pico8.print(
+                            &format!("{:0>10}{}", self.chall_points, " POINTS + "),
+                            4,
+                            118,
+                            7,
+                        );
+                        pico8.print(
+                            &format!("{:0>3}{}", self.chall_stacks, " STACKS"),
+                            85,
+                            118,
+                            7,
+                        );
+                    }
+                }
+            }
             true => {
                 pico8.print(
                     &format!("{}{}", "TURNS:", self.stake_num),
@@ -424,57 +499,6 @@ impl App for Game {
                 );
                 pico8.print(&format!("{:0>3}{}", self.max_stacks, " STACKS"), 85, 118, 7);
             }
-            false => match self.limitless {
-                false => {
-                    let remaining = self.chall_turns - self.stake_num;
-                    pico8.print(
-                        &format!(
-                            "{}{}{}{}",
-                            "TURNS:", self.stake_num, " REMAINING:", remaining
-                        ),
-                        63 - (12
-                            + self.stake_num.to_string().len() * 2
-                            + 22
-                            + remaining.to_string().len() * 2) as i32,
-                        14,
-                        7,
-                    );
-                    pico8.print(
-                        &format!("{}{}", "CURRENT CHALLENGE - ", self.difficulty),
-                        63 - 40 - (self.difficulty.len() * 2) as i32,
-                        108,
-                        9,
-                    );
-                    pico8.print(
-                        &format!("{:0>10}{}", self.chall_points, " POINTS + "),
-                        4,
-                        118,
-                        7,
-                    );
-                    pico8.print(
-                        &format!("{:0>3}{}", self.chall_stacks, " STACKS"),
-                        85,
-                        118,
-                        7,
-                    );
-                }
-                true => {
-                    pico8.print(
-                        &format!("{}{}", "TURNS:", self.stake_num),
-                        63 - (12 + self.stake_num.to_string().len() * 2) as i32,
-                        14,
-                        7,
-                    );
-                    pico8.print("LIMITLESS PERSONAL BEST", 63 - 46, 108, 9);
-                    pico8.print(
-                        &format!("{:0>10}{}", self.max_points, " POINTS + "),
-                        4,
-                        118,
-                        7,
-                    );
-                    pico8.print(&format!("{:0>3}{}", self.max_stacks, " STACKS"), 85, 118, 7);
-                }
-            },
         }
         match self.investing {
             false => {
@@ -524,6 +548,8 @@ impl Game {
     const FIRST_DIGIT: i32 = 79;
     const LAST_DIGIT: i32 = 115;
     const SELECT_FIRST: i32 = 65;
+    const SELECT_SECOND: i32 = 75;
+    const SELECT_THIRD: i32 = 85;
     const SELECT_LAST: i32 = 95;
 }
 
