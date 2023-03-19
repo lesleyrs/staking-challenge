@@ -23,12 +23,14 @@ struct Game {
     msg_timer: u8,
     show_msg: bool,
     arrow_pos: i32,
-    lose_msg: bool,
+    end_message: bool,
     start_timer: u8,
+    chall_stacks: u8,
     chall_points: i32,
     chall_turns: i32,
     limitless: bool,
     game_won: bool,
+    difficulty: String,
 }
 
 impl App for Game {
@@ -57,12 +59,14 @@ impl App for Game {
             msg_timer: 0,
             show_msg: false,
             arrow_pos: 65,
-            lose_msg: false,
+            end_message: false,
             start_timer: 0,
+            chall_stacks: 0,
             chall_points: 0,
             chall_turns: 0,
             limitless: false,
             game_won: false,
+            difficulty: String::from(""),
         }
     }
 
@@ -145,21 +149,48 @@ impl App for Game {
                 // not exactly 50/50 as it rounds float up halfway
                 // flr() favors lower ints because it still generates a float
                 self.rng = rnd(1.0).round() as u8;
-                if self.rng == 1 {
-                    let (mut a, b) = self.points.overflowing_add(self.stake);
-                    if b {
-                        self.stacks += 1;
-                        a -= i32::MIN;
-                        // +1 is needed because overflowing takes 1 to reach 0
-                        a += 1;
+                match self.invested {
+                    0 => {
+                        if self.rng == 1 {
+                            let (mut a, b) = self.points.overflowing_add(self.stake);
+                            if b {
+                                self.stacks += 1;
+                                a -= i32::MIN;
+                                // +1 is needed because overflowing takes 1 to reach 0
+                                a += 1;
+                            }
+                            self.points = a;
+                        }
                     }
-                    self.points = a;
+                    _ => {
+                        if self.rng == 1 {
+                            let (mut a, b) = self
+                                .points
+                                .overflowing_add(self.stake + self.invested / 100);
+                            if b {
+                                self.stacks += 1;
+                                a -= i32::MIN;
+                                // +1 is needed because overflowing takes 1 to reach 0
+                                a += 1;
+                            }
+                            self.points = a;
+                        }
+                    }
                 }
                 if self.rng == 0 {
                     self.points -= self.stake;
+                    if self.invested > 0 && self.points > 0 {
+                        let (mut a, b) = self.points.overflowing_add(self.invested / 100);
+                        if b {
+                            self.stacks += 1;
+                            a -= i32::MIN;
+                            a += 1;
+                        }
+                        self.points = a;
+                    }
                 }
                 if self.points == 0 && self.stacks == 0 && self.invested == 0 {
-                    self.lose_msg = true;
+                    self.end_message = true;
                 }
                 self.last_stake = self.stake;
                 self.stake = 0;
@@ -224,7 +255,7 @@ impl App for Game {
                 }
             }
         }
-        if !self.lose_msg && self.start_timer < 10 {
+        if !self.end_message && self.start_timer < 10 {
             self.start_timer += 1;
         }
         if self.game_over && pico8.btnp(Button::Cross) && self.anim_num == self.stake_num {
@@ -236,27 +267,34 @@ impl App for Game {
             self.income = 0;
             self.stake_num = 0;
             self.anim_num = 0;
-            self.lose_msg = false;
+            self.end_message = false;
             self.start_timer = 0;
             self.chall_turns = 100;
             self.game_won = false;
 
             match self.arrow_pos {
                 Game::SELECT_FIRST => {
-                    self.chall_points = i32::MAX;
-                    self.points = 250000000; // 250m
+                    self.chall_stacks = 3;
+                    self.chall_points = 0;
+                    self.points = 2000000000; // 250m
+                    self.difficulty = "EASY".to_string();
                 }
                 75 => {
-                    self.chall_points = 1000000000;
+                    self.chall_stacks = 1;
+                    self.chall_points = 0;
                     self.points = 50000000; // 50m
+                    self.difficulty = "NORMAL".to_string();
                 }
                 85 => {
+                    self.chall_stacks = 0;
                     self.chall_points = 10000000;
                     self.points = 10000; // 10k from stronghold of security
+                    self.difficulty = "HARD".to_string();
                 }
                 Game::SELECT_LAST => {
                     self.limitless = true;
                     self.points = 25; // 25 from tutorial island
+                    self.difficulty = "LIMITLESS".to_string();
                 }
                 _ => unreachable!(),
             }
@@ -265,10 +303,10 @@ impl App for Game {
             self.investing = !self.investing;
         }
         if !self.limitless && !self.game_over {
-            if self.points >= self.chall_points {
+            if self.points >= self.chall_points && self.stacks >= self.chall_stacks {
                 self.game_won = true;
             }
-            if self.stake_num == self.chall_turns || self.points >= self.chall_points {
+            if self.stake_num == self.chall_turns || self.game_won {
                 self.invested = 0;
                 self.stacks = 0;
                 self.points = 0;
@@ -286,8 +324,8 @@ impl App for Game {
                     self.limitless = false;
                 }
                 self.game_over = true;
-                if self.stake_num == self.chall_turns && self.stake_num != 0 {
-                    self.lose_msg = true;
+                if self.stake_num == self.chall_turns && self.stake_num != 0 || self.game_won {
+                    self.end_message = true;
                 }
             }
         }
@@ -326,7 +364,7 @@ impl App for Game {
                 self.show_msg = false;
             }
         }
-        if self.lose_msg {
+        if self.end_message {
             match self.game_won {
                 false => pico8.print("GAME OVER!", Game::FIRST_DIGIT, 53, 8),
                 true => pico8.print("YOU WIN!", Game::FIRST_DIGIT, 53, 11),
@@ -358,7 +396,6 @@ impl App for Game {
         // 63 - (text length * 2) to center text horizontically
         // 63 - 3 to center text vertically
 
-        // set this to current challenge instead of title?
         pico8.print(
             &Game::TITLE.to_uppercase(),
             63 - (Game::TITLE.len() * 2) as i32,
@@ -373,6 +410,14 @@ impl App for Game {
                     14,
                     7,
                 );
+                pico8.print("LIMITLESS PERSONAL BEST", 63 - 46, 108, 9);
+                pico8.print(
+                    &format!("{:0>10}{}", self.max_points, " POINTS + "),
+                    4,
+                    118,
+                    7,
+                );
+                pico8.print(&format!("{:0>3}{}", self.max_stacks, " STACKS"), 85, 118, 7);
             }
             false => match self.limitless {
                 false => {
@@ -389,6 +434,24 @@ impl App for Game {
                         14,
                         7,
                     );
+                    pico8.print(
+                        &format!("{}{}", "CURRENT CHALLENGE - ", self.difficulty),
+                        63 - 40 - (self.difficulty.len() * 2) as i32,
+                        108,
+                        9,
+                    );
+                    pico8.print(
+                        &format!("{:0>10}{}", self.chall_points, " POINTS + "),
+                        4,
+                        118,
+                        7,
+                    );
+                    pico8.print(
+                        &format!("{:0>3}{}", self.chall_stacks, " STACKS"),
+                        85,
+                        118,
+                        7,
+                    );
                 }
                 true => {
                     pico8.print(
@@ -397,6 +460,14 @@ impl App for Game {
                         14,
                         7,
                     );
+                    pico8.print("LIMITLESS PERSONAL BEST", 63 - 46, 108, 9);
+                    pico8.print(
+                        &format!("{:0>10}{}", self.max_points, " POINTS + "),
+                        4,
+                        118,
+                        7,
+                    );
+                    pico8.print(&format!("{:0>3}{}", self.max_stacks, " STACKS"), 85, 118, 7);
                 }
             },
         }
@@ -424,14 +495,6 @@ impl App for Game {
         pico8.print(&format!("{}{}", "INVEST:", self.invested), 8, 43, 7);
         pico8.print(&format!("{}{}", "INCOME:", self.income), 8, 53, 7);
 
-        pico8.print("LIMITLESS PERSONAL BEST", 63 - 46, 108, 9);
-        pico8.print(
-            &format!("{:0>10}{}", self.max_points, " POINTS + "),
-            4,
-            118,
-            7,
-        );
-        pico8.print(&format!("{:0>3}{}", self.max_stacks, " STACKS"), 85, 118, 7);
         if self.game_over && self.anim_num == self.stake_num {
             pico8.rectfill(20, 61, 107, 104, 5);
             pico8.print("EASY", 63 - 8, 65, 7);
