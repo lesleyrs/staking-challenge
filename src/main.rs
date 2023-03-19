@@ -286,6 +286,9 @@ impl App for Game {
                     self.limitless = false;
                 }
                 self.game_over = true;
+                if self.stake_num == self.chall_turns && self.stake_num != 0 {
+                    self.lose_msg = true;
+                }
             }
         }
         if self.limitless {
@@ -362,12 +365,41 @@ impl App for Game {
             4,
             15,
         );
-        pico8.print(
-            &format!("{}{}", "TOTAL TURNS:", self.stake_num),
-            63 - (24 + self.stake_num.to_string().len() * 2) as i32,
-            14,
-            7,
-        );
+        match self.game_over {
+            true => {
+                pico8.print(
+                    &format!("{}{}", "TURNS:", self.stake_num),
+                    63 - (12 + self.stake_num.to_string().len() * 2) as i32,
+                    14,
+                    7,
+                );
+            }
+            false => match self.limitless {
+                false => {
+                    let remaining = self.chall_turns - self.stake_num;
+                    pico8.print(
+                        &format!(
+                            "{}{}{}{}",
+                            "TURNS:", self.stake_num, " REMAINING:", remaining
+                        ),
+                        63 - (12
+                            + self.stake_num.to_string().len() * 2
+                            + 22
+                            + remaining.to_string().len() * 2) as i32,
+                        14,
+                        7,
+                    );
+                }
+                true => {
+                    pico8.print(
+                        &format!("{}{}", "TURNS:", self.stake_num),
+                        63 - (12 + self.stake_num.to_string().len() * 2) as i32,
+                        14,
+                        7,
+                    );
+                }
+            },
+        }
         match self.investing {
             false => {
                 pico8.rectfill(7, 23, 75, 39, 1);
@@ -403,7 +435,7 @@ impl App for Game {
         if self.game_over && self.anim_num == self.stake_num {
             pico8.rectfill(20, 61, 107, 104, 5);
             pico8.print("EASY", 63 - 8, 65, 7);
-            pico8.print("MEDIUM", 63 - 12, 75, 7);
+            pico8.print("NORMAL", 63 - 12, 75, 7);
             pico8.print("HARD", 63 - 8, 85, 7);
             pico8.print("LIMITLESS", 63 - 18, 95, 7);
             pico8.pset(38, self.arrow_pos, 9);
