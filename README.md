@@ -12,6 +12,6 @@ or here:
 https://lesleyrs.itch.io/staking-challenge
 
 ### Controls
-Controls are "X" for cross/accept, "C" for circle/cancel (in this case it's only for investing), arrow keys to select.
+Controls are `X` for cross/accept, `C` for circle/cancel (in this case it's only for investing), `arrow keys` to select.
 
-"1 stack" equals to roughly 2147 million or a 32 bit signed integer
+`1 stack` equals to roughly 2147 million or a 32 bit signed integer
