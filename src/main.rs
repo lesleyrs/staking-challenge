@@ -225,6 +225,9 @@ impl App for Game {
                     }
                     self.points = a;
                     self.invested = 0;
+                    if self.stake > self.points {
+                        self.stake = self.points;
+                    }
                 }
             }
         }
@@ -276,7 +279,7 @@ impl App for Game {
                 Game::SELECT_FIRST => {
                     self.chall_stacks = 3;
                     self.chall_points = 0;
-                    self.points = 2000000000; // 250m
+                    self.points = 2140000000; // 250m
                     self.difficulty = "EASY".to_string();
                 }
                 75 => {
