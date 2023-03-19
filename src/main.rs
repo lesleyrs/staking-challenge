@@ -19,7 +19,6 @@ struct Game {
     anim_num: i32,
     investing: bool,
     invested: i32,
-    income: i32,
     msg_timer: u8,
     show_msg: bool,
     arrow_pos: i32,
@@ -55,7 +54,6 @@ impl App for Game {
             anim_num: 0,
             investing: false,
             invested: 0,
-            income: 0,
             msg_timer: 0,
             show_msg: false,
             arrow_pos: 65,
@@ -164,13 +162,19 @@ impl App for Game {
                     }
                     _ => {
                         if self.rng == 1 {
-                            let (mut a, b) = self
-                                .points
-                                .overflowing_add(self.stake + self.invested / 100);
+                            let (mut a, b) = self.points.overflowing_add(self.stake);
                             if b {
                                 self.stacks += 1;
                                 a -= i32::MIN;
                                 // +1 is needed because overflowing takes 1 to reach 0
+                                a += 1;
+                            }
+                            self.points = a;
+                            let (mut a, b) = self.points.overflowing_add(self.invested / 100);
+                            if b {
+                                self.stacks += 1;
+                                a -= i32::MIN;
+                                // this is incase of double overflows
                                 a += 1;
                             }
                             self.points = a;
@@ -207,7 +211,6 @@ impl App for Game {
             match self.invested {
                 0 => {
                     if self.stake < self.points || self.stacks > 0 {
-                        // add actual income
                         let stake = self.stake;
                         self.invested += stake;
                         self.points -= stake;
@@ -267,7 +270,6 @@ impl App for Game {
             self.digit = 1;
             self.pos = Game::FIRST_DIGIT;
             self.invested = 0;
-            self.income = 0;
             self.stake_num = 0;
             self.anim_num = 0;
             self.end_message = false;
@@ -279,7 +281,7 @@ impl App for Game {
                 Game::SELECT_FIRST => {
                     self.chall_stacks = 3;
                     self.chall_points = 0;
-                    self.points = 2140000000; // 250m
+                    self.points = 250000000; // 250m
                     self.difficulty = "EASY".to_string();
                 }
                 75 => {
@@ -496,7 +498,7 @@ impl App for Game {
         );
         pico8.line(self.pos, 30, self.pos + 2, 30, 9);
         pico8.print(&format!("{}{}", "INVEST:", self.invested), 8, 43, 7);
-        pico8.print(&format!("{}{}", "INCOME:", self.income), 8, 53, 7);
+        pico8.print(&format!("{}{}", "INCOME:", self.invested / 100), 8, 53, 7);
 
         if self.game_over && self.anim_num == self.stake_num {
             pico8.rectfill(20, 61, 107, 104, 5);
