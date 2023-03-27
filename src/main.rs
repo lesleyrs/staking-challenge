@@ -7,7 +7,7 @@ struct Game {
     stake: i32,
     frames: i32,
     delay: i32,
-    digit: u8,
+    digit: u32,
     pos: i32,
     value: i32,
     max_points: i32,
@@ -71,20 +71,9 @@ impl App for Game {
 
     fn update(&mut self, pico8: &mut runty8::Pico8) {
         self.frames += 1;
-        // how to calc this instead?
-        match self.digit {
-            1 => self.value = 1000000000,
-            2 => self.value = 100000000,
-            3 => self.value = 10000000,
-            4 => self.value = 1000000,
-            5 => self.value = 100000,
-            6 => self.value = 10000,
-            7 => self.value = 1000,
-            8 => self.value = 100,
-            9 => self.value = 10,
-            10 => self.value = 1,
-            _ => unreachable!(),
-        }
+        // bing ai calculated this for me in seconds...lol
+        // self.digit has to be u32 only because pow requires it
+        self.value = 10i32.pow(10 - self.digit);
         if self.frames > self.delay {
             match self.digit {
                 1 => {
